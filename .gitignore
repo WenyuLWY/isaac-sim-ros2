@@ -1,2 +1,3 @@
 tmp/
 .docker.*.xauth
+src/autonomous_exploration_development_environment/

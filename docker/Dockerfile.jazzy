@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1
+FROM osrf/ros:jazzy-desktop-full 
+
+#add user
+RUN groupadd -g 1234 user && \
+    useradd -m -u 1234 -g 1234 -s /bin/bash user && \
+    echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+RUN apt-get update && apt-get install -y ros-jazzy-pcl-ros libpcl-dev libusb-dev
+
+USER user
+RUN mkdir -p /home/user/ros2_ws/src /home/user/tmp/runtime-root
+# RUN cd ~/ros2_ws && \
+#     bash -c "source /opt/ros/jazzy/setup.bash && colcon build"
+
+RUN cat <<'EOF' >> /home/user/.bashrc
+source /opt/ros/jazzy/setup.bash
+EOF
+
+
+# apt-get update && apt-get install -y /tmp/ros2-apt-source.deb
+
+# RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+# RUN apt-get update && apt-get install -y python-is-python3 python3-pip unzip xterm
+# RUN pip install gdown
+# RUN apt-get update && apt-get install -y ros-humble-rqt-tf-tree
+
+RUN cat <<'EOF' > /home/user/start.sh && chmod +x /home/user/start.sh
+#!/bin/bash
+set -e
+cd ~/ros2_ws
+source /opt/ros/jazzy/setup.bash
+colcon build
+source ~/ros2_ws/install/setup.bash
+echo "source ~/ros2_ws/install/setup.bash" >> ~/.bashrc
+exec "$@"
+EOF
+
+# exec "$@"
+
+ENTRYPOINT ["/home/user/start.sh"]
+
+CMD ["sleep", "infinity"]

@@ -1,16 +1,16 @@
 services:
-
   hub-cache:
     image: nvcr.io/nvidia/omniverse/hub_workstation_cache:2.2.0
     network_mode: "host"
     user: "1234:1234"
     volumes:
-     - ${ISAACSIM_HUB_CACHE_PATH:-~/.cache/ov/hub}:/var/cache/hub:rw
+     - ~/.cache/ov/hub:/var/cache/hub:rw
     restart: unless-stopped
 
   isaac-sim:
-    image: ${ISAAC_SIM_IMAGE:-isaac-sim-docker:latest}
+    image: nvcr.io/nvidia/isaac-sim:6.2.0
     network_mode: "host"
+    ipc: host
     gpus: all
     user: "1234:1234"
     healthcheck:
@@ -23,34 +23,50 @@ services:
       hub-cache:
         condition: service_started
     environment:
-      - NVIDIA_VISIBLE_DEVICES=${GPU_DEVICE:-all}
+      - NVIDIA_VISIBLE_DEVICES=all
       - ACCEPT_EULA=Y
-      - ISAACSIM_HOST=${ISAACSIM_HOST:-127.0.0.1}
-      - ISAACSIM_SIGNAL_PORT=${ISAACSIM_SIGNAL_PORT:-49100}
-      - ISAACSIM_STREAM_PORT=${ISAACSIM_STREAM_PORT:-47998}
+      - ISAACSIM_HOST=127.0.0.1
+      - ISAACSIM_SIGNAL_PORT=49100
+      - ISAACSIM_STREAM_PORT=47998
+      # - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      # - FASTRTPS_DEFAULT_PROFILES_FILE=/isaac-sim/fastdds.xml
+      # - ROS_DOMAIN_ID=0
     volumes:
-      - ${ISAAC_SIM_DATA:-~/docker/isaac-sim}/cache/main:/isaac-sim/.cache:rw
-      - ${ISAAC_SIM_DATA:-~/docker/isaac-sim}/cache/computecache:/isaac-sim/.nv/ComputeCache:rw
-      - ${ISAAC_SIM_DATA:-~/docker/isaac-sim}/cache/kit:/isaac-sim/kit/cache:rw
-      - ${ISAAC_SIM_DATA:-~/docker/isaac-sim}/logs:/isaac-sim/.nvidia-omniverse/logs:rw
-      - ${ISAAC_SIM_DATA:-~/docker/isaac-sim}/config:/isaac-sim/.nvidia-omniverse/config:rw
-      - ${ISAAC_SIM_DATA:-~/docker/isaac-sim}/data:/isaac-sim/.local/share/ov/data:rw
-      - ${ISAAC_SIM_DATA:-~/docker/isaac-sim}/pkg:/isaac-sim/.local/share/ov/pkg:rw
-      - ${ISAACSIM_HUB_CACHE_PATH:-~/.cache/ov/hub}:/var/cache/hub:rw
+      - ${PWD}/../tmp/isaac/cache/main:/isaac-sim/.cache:rw
+      - ${PWD}/../tmp/isaac/cache/computecache:/isaac-sim/.nv/ComputeCache:rw
+      - ${PWD}/../tmp/isaac/cache/kit:/isaac-sim/kit/cache:rw
+      - ${PWD}/../tmp/isaac/logs:/isaac-sim/.nvidia-omniverse/logs:rw
+      - ${PWD}/../tmp/isaac/config:/isaac-sim/.nvidia-omniverse/config:rw
+      - ${PWD}/../tmp/isaac/data:/isaac-sim/.local/share/ov/data:rw
+      - ${PWD}/../tmp/isaac/pkg:/isaac-sim/.local/share/ov/pkg:rw
+      - ~/.cache/ov/hub:/var/cache/hub:rw
+      - ${PWD}/my_test:/isaac-sim/my_test:rw
+      # - ${PWD}/fastdds.xml:/isaac-sim/fastdds.xml:ro
+    # command: >
+    #   bash -c "
+    #   set -e &&
+    #   /isaac-sim/python.sh /isaac-sim/my_test/test.py
+    #   "
+    # entrypoint: ["bash", "-c", "set -e && /isaac-sim/python.sh /isaac-sim/my_test/test.py"]
+    # entrypoint: ["/bin/bash", "-c"]
+    # command: ["/isaac-sim/python.sh /isaac-sim/my_test/test.py"]
+    # command: ["/isaac-sim/license.sh && /isaac-sim/privacy.sh && exec /isaac-sim/python.sh /isaac-sim/my_test/test.py"]
+    entrypoint: ["/isaac-sim/python.sh"]
+    command: ["/isaac-sim/my_test/test.py"]
     restart: unless-stopped
 
   web-viewer:
     build:
-      context: ./web-viewer
+      dockerfile: Dockerfile.webviewer
       network: host
       args:
-        ISAACSIM_HOST: ${ISAACSIM_HOST:-127.0.0.1}
-        ISAACSIM_SIGNAL_PORT: ${ISAACSIM_SIGNAL_PORT:-49100}
-        ISAACSIM_STREAM_PORT: ${ISAACSIM_STREAM_PORT:-47998}
+        ISAACSIM_HOST: 127.0.0.1
+        ISAACSIM_SIGNAL_PORT: 49100
+        ISAACSIM_STREAM_PORT: 47998
     network_mode: "host"
-    command: ["npx", "vite", "preview", "--host", "--port", "${WEB_VIEWER_PORT:-8210}"]
+    command: ["npx", "vite", "preview", "--host", "--port", "8210"]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${WEB_VIEWER_PORT:-8210}/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8210/"]
       interval: 30s
       timeout: 5s
       start_period: 10s
@@ -60,32 +76,73 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ros2-humble:
+  #   build:
+  #     dockerfile: Dockerfile.humble
+  #     network: host
+  #   gpus: all
+  #   command: bash
+  #   tty: true
+  #   stdin_open: true
+  #   # command: ["bash","-c","/root/start.sh"]
+  #   volumes:
+  #     # - ${PKG_ROOT_DIR:-../}/src:/root/ros2_ws/src
+  #     # - ${PKG_ROOT_DIR:-../}/tmp/ros2/build:/root/ros2_ws/build
+  #     # - ${PKG_ROOT_DIR:-../}/tmp/ros2/install:/root/ros2_ws/install
+  #     # - ${PKG_ROOT_DIR:-../}/tmp/ros2/log:/root/ros2_ws/log
+  #     - /tmp/.X11-unix:/tmp/.X11-unix:rw
+  #     - ${PWD}/.docker.container.xauth:/root/.docker.container.xauth
+  #     - /dev:/dev 
+  #     - /etc/localtime:/etc/localtime:ro
+  #     - ${PWD}/fastdds.xml:/root/.ros/fastdds.xml:ro
+  #   environment:
+  #     - DISPLAY=${DISPLAY}
+  #     - QT_X11_NO_MITSHM=1
+  #     - XAUTHORITY=/root/.docker.container.xauth
+  #     - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+  #     - FASTRTPS_DEFAULT_PROFILES_FILE=/root/.ros/fastdds.xml
+  #     - ROS_DOMAIN_ID=0
+  #     # - TERM=xterm-256color
+  #   network_mode: "host"
+  #   ipc: host
+  #   depends_on:
+  #     isaac-sim:
+  #       condition: service_healthy
+  #   restart: no
 
-  ros2-humble:
-    build: .
+  ros2-jazzy:
+    build:
+      dockerfile: Dockerfile.jazzy
     gpus: all
-    command: bash
-    tty: true
-    stdin_open: true
+    user: "1234:1234"
+    # command: bash
+    # tty: true
+    # stdin_open: true
     # command: ["bash","-c","/root/start.sh"]
     volumes:
-      - ${PKG_ROOT_DIR:-../}/src:/root/ros2_ws/src
-      - ${PKG_ROOT_DIR:-../}/tmp/ros2/build:/root/ros2_ws/build
-      - ${PKG_ROOT_DIR:-../}/tmp/ros2/install:/root/ros2_ws/install
-      - ${PKG_ROOT_DIR:-../}/tmp/ros2/log:/root/ros2_ws/log
+      - ${PWD}/../tmp/ros2/build:/home/user/ros2_ws/build
+      - ${PWD}/../tmp/ros2/install:/home/user/ros2_ws/install
+      - ${PWD}/../tmp/ros2/log:/home/user/ros2_ws/log
+      - ${PWD}/../src:/home/user/ros2_ws/src
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ${XAUTH_PATH:-/.docker.container.xauth}:/root/.docker.container.xauth
+      - ${PWD}/.docker.container.xauth:/home/user/.docker.container.xauth
       - /dev:/dev 
       - /etc/localtime:/etc/localtime:ro
+      # - ${PWD}/fastdds.xml:/root/.ros/fastdds.xml:ro
     environment:
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
-      - XAUTHORITY=/root/.docker.container.xauth
+      - XAUTHORITY=/home/user/.docker.container.xauth
+      - __GLX_VENDOR_LIBRARY_NAME=nvidia
+      - __NV_PRIME_RENDER_OFFLOAD=1
+      - __GL_SYNC_TO_VBLANK=0
+      # - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      # - FASTRTPS_DEFAULT_PROFILES_FILE=/root/.ros/fastdds.xml
+      # - ROS_DOMAIN_ID=0
       # - TERM=xterm-256color
     network_mode: "host"
+    ipc: host
     depends_on:
       isaac-sim:
-        condition: service_started
-    restart: unless-stopped
-
-
+        condition: service_healthy
+    restart: no

@@ -1,0 +1,71 @@
+FROM osrf/ros:humble-desktop-full
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /root
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+RUN apt-get update && apt-get install -y python-is-python3 python3-pip unzip xterm
+RUN pip install gdown
+RUN apt-get update && apt-get install -y ros-humble-rqt-tf-tree
+
+RUN git clone --branch IsaacSim-6.2.0 --recurse-submodules https://github.com/isaac-sim/IsaacSim-ros_workspaces.git ~/IsaacSim-ros_workspaces
+
+
+RUN apt-get update && apt-get install -y \
+    # ===== Navigation2 =====
+    ros-humble-joint-state-publisher \
+    ros-humble-navigation2 \
+    ros-humble-nav2-amcl \
+    ros-humble-nav2-bringup \
+    ros-humble-nav2-bt-navigator \
+    ros-humble-nav2-costmap-2d \
+    ros-humble-nav2-core \
+    ros-humble-nav2-dwb-controller \
+    ros-humble-nav2-lifecycle-manager \
+    ros-humble-nav2-map-server \
+    ros-humble-nav2-behaviors \
+    ros-humble-nav2-planner \
+    ros-humble-nav2-msgs \
+    ros-humble-nav2-navfn-planner \
+    ros-humble-nav2-rviz-plugins \
+    ros-humble-nav2-behavior-tree \
+    ros-humble-nav2-util \
+    ros-humble-nav2-voxel-grid \
+    ros-humble-nav2-controller \
+    ros-humble-nav2-waypoint-follower \
+    ros-humble-pointcloud-to-laserscan \
+    # ===== ros2_control =====
+    ros-humble-ros2-control \
+    ros-humble-ros2-controllers \
+    ros-humble-controller-manager \
+    ros-humble-joint-trajectory-controller \
+    ros-humble-joint-state-broadcaster \
+    ros-humble-topic-based-ros2-control \
+    ros-humble-control-msgs \
+    # ===== 消息 & 工具 =====
+    ros-humble-ackermann-msgs \
+    ros-humble-joint-state-publisher-gui \
+    # ===== Python 依赖 =====
+    python3-numpy \
+    python3-pil \
+    python3-yaml \
+    python3-pytest \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /root/ros2_ws/src
+
+    # cd ~/ros2_ws && \
+    # bash -c "source /opt/ros/humble/setup.bash && colcon build" && \
+    # echo "source /root/ros2_ws/install/setup.bash" >> ~/.bashrc
+
+RUN echo "#!/bin/bash" > /root/start.sh && \
+    echo "cd /root/ros2_ws" >> /root/start.sh && \
+    echo "source /opt/ros/humble/setup.bash" >> /root/start.sh && \
+    echo "colcon build" >> /root/start.sh && \
+    echo "source /root/ros2_ws/install/setup.bash" >> /root/start.sh && \
+    echo "exec \"\$@\"" >> /root/start.sh && \
+    chmod +x /root/start.sh
+
+ENTRYPOINT ["/root/start.sh"]
+
+CMD ["/bin/bash"]
